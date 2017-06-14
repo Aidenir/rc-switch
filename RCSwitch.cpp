@@ -303,8 +303,8 @@ char* RCSwitch::getCodeWordA(const char* sGroup, const char* sDevice, bool bStat
     sReturn[nReturnPos++] = (sDevice[i] == '0') ? 'F' : '0';
   }
 
-  sReturn[nReturnPos++] = bStatus ? '0' : 'F';
-  sReturn[nReturnPos++] = bStatus ? 'F' : '0';
+  sReturn[nReturnPos++] = !bStatus ? '0' : 'F';
+  sReturn[nReturnPos++] = !bStatus ? 'F' : '0';
 
   sReturn[nReturnPos] = '\0';
   return sReturn;
@@ -428,8 +428,8 @@ char* RCSwitch::getCodeWordD(char sGroup, int nDevice, bool bStatus) {
   sReturn[nReturnPos++] = '0';
   sReturn[nReturnPos++] = '0';
 
-  sReturn[nReturnPos++] = !bStatus ? '1' : '0';
-  sReturn[nReturnPos++] = !bStatus ? '0' : '1';
+  sReturn[nReturnPos++] = bStatus ? '1' : '0';
+  sReturn[nReturnPos++] = bStatus ? '0' : '1';
 
   sReturn[nReturnPos] = '\0';
   return sReturn;
