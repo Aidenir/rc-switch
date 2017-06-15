@@ -473,14 +473,14 @@ char* getCodeWordF(const char* sHouse, bool bGroup, int nChannel, int nDevice, b
 
   // Set the channel code, 1 = 11, 2 = 10, 3 = 01, 4 = 00, plus the checksum bit
   sReturn[nReturnPos] = (nChannel <= 2) ? '1' : '0';
-  sReturn[nReturnPos+2] = (nChannel >= 3) ? '0' : '1';
+  sReturn[nReturnPos+2] = (nChannel% 2 == 0) ? '0' : '1';
   sReturn[nReturnPos+1] = (sReturn[nReturnPos] == '0') ? '1' : '0';
   sReturn[nReturnPos+3] = (sReturn[nReturnPos+2] == '0') ? '1' : '0';
   nReturnPos += 4;
 
   // Set the device code, 1 = 11, 2 = 10, 3 = 01, 4 = 00, plus the checksum bit
   sReturn[nReturnPos] = (nDevice <= 2) ? '1' : '0';
-  sReturn[nReturnPos+2] = (nDevice >= 3) ? '0' : '1';
+  sReturn[nReturnPos+2] = (nDevice % 2 == 0) ? '0' : '1';
   sReturn[nReturnPos+1] = (sReturn[nReturnPos] == '0') ? '1' : '0';
   sReturn[nReturnPos+3] = (sReturn[nReturnPos+2] == '0') ? '1' : '0';
   nReturnPos += 4;
