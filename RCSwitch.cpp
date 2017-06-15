@@ -73,12 +73,13 @@ static const RCSwitch::Protocol proto[] = {
 #else
 static const RCSwitch::Protocol PROGMEM proto[] = {
 #endif
-  { 350, {  1, 31 }, {  1,  3 }, {  3,  1 }, false },    // protocol 1
-  { 650, {  1, 10 }, {  1,  2 }, {  2,  1 }, false },    // protocol 2
-  { 100, { 30, 71 }, {  4, 11 }, {  9,  6 }, false },    // protocol 3
-  { 380, {  1,  6 }, {  1,  3 }, {  3,  1 }, false },    // protocol 4
-  { 500, {  6, 14 }, {  1,  2 }, {  2,  1 }, false },    // protocol 5
-  { 450, { 23,  1 }, {  1,  2 }, {  2,  1 }, true }      // protocol 6 (HT6P20B)
+  { 350, {  1, 31 }, { 0, 0 },  {  1,  3 }, {  3,  1 }, false },    // protocol 1
+  { 650, {  1, 10 }, { 0, 0 },  {  1,  2 }, {  2,  1 }, false },    // protocol 2
+  { 100, { 30, 71 }, { 0, 0 },  {  4, 11 }, {  9,  6 }, false },    // protocol 3
+  { 380, {  1,  6 }, { 0, 0 },  {  1,  3 }, {  3,  1 }, false },    // protocol 4
+  { 500, {  6, 14 }, { 0, 0 },  {  1,  2 }, {  2,  1 }, false },    // protocol 5
+  { 450, { 23,  1 }, { 0, 0 },  {  1,  2 }, {  2,  1 }, true },     // protocol 6 (HT6P20B)
+  { 250, { 1,  40 }, { 1, 10 }, {  1,  5 }, {  1,  2 }, false }     // protocol 7 (NEXA)
 };
 
 enum {
@@ -286,6 +287,22 @@ void RCSwitch::switchOff(const char* sGroup, const char* sDevice) {
   this->sendTriState( this->getCodeWordA(sGroup, sDevice, false) );
 }
 
+/**
+ * Switch a remote switch on (Type F with NEXA Autolearning)
+ *
+ */
+void switchOn(const char* sHouse, bool bGroup, int nChannel, int nDevice){
+  this->send( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, true) );
+}
+
+/**
+ * Switch a remote switch off (Type F with NEXA Autolearning)
+ *
+ */
+void switchOff(const char* sHouse, bool bGroup, int nChannel, int nDevice){
+  this->send( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, false) );
+}
+
 
 /**
  * Returns a char[13], representing the code word to be send.
@@ -436,6 +453,43 @@ char* RCSwitch::getCodeWordD(char sGroup, int nDevice, bool bStatus) {
 }
 
 /**
+ TODO
+ */
+char* getCodeWordF(const char* sHouse, bool bGroup, int nChannel, int nDevice, bool bStatus){
+  static char sReturn[65];
+  int nReturnPos = 0;
+
+  for(int i = 0; i < 26 ; ++i){
+    sReturn[nReturnPos++] = (sHouse[i] == '0') ? '0' : '1';
+    sReturn[nReturnPos++] = (sHouse[i] == '0') ? '1' : '0';
+  }
+
+
+  sReturn[nReturnPos++] = (bGroup) ? '0' : '1';
+  sReturn[nReturnPos++] = (bGroup) ? '1' : '0';
+
+  sReturn[nReturnPos++] = (bStatus) ? '0' : '1';
+  sReturn[nReturnPos++] = (bStatus) ? '1' : '0';
+
+  // Set the channel code, 1 = 11, 2 = 10, 3 = 01, 4 = 00, plus the checksum bit
+  sReturn[nReturnPos] = (nChannel <= 2) ? '1' : '0';
+  sReturn[nReturnPos+2] = (nChannel >= 3) ? '0' : '1';
+  sReturn[nReturnPos+1] = (sReturn[nReturnPos] == '0') ? '1' : '0';
+  sReturn[nReturnPos+3] = (sReturn[nReturnPos+2] == '0') ? '1' : '0';
+  nReturnPos += 4;
+
+  // Set the device code, 1 = 11, 2 = 10, 3 = 01, 4 = 00, plus the checksum bit
+  sReturn[nReturnPos] = (nDevice <= 2) ? '1' : '0';
+  sReturn[nReturnPos+2] = (nDevice >= 3) ? '0' : '1';
+  sReturn[nReturnPos+1] = (sReturn[nReturnPos] == '0') ? '1' : '0';
+  sReturn[nReturnPos+3] = (sReturn[nReturnPos+2] == '0') ? '1' : '0';
+  nReturnPos += 4;
+
+  sReturn[nReturnPos++] = '0';
+  return sReturn;
+}
+
+/**
  * @param sCodeWord   a tristate code word consisting of the letter 0, 1, F
  */
 void RCSwitch::sendTriState(const char* sCodeWord) {
@@ -496,6 +550,7 @@ void RCSwitch::send(unsigned long code, unsigned int length) {
 #endif
 
   for (int nRepeat = 0; nRepeat < nRepeatTransmit; nRepeat++) {
+    this->transmit(protocol.pauseFactor);
     for (int i = length-1; i >= 0; i--) {
       if (code & (1L << i))
         this->transmit(protocol.one);
@@ -517,6 +572,9 @@ void RCSwitch::send(unsigned long code, unsigned int length) {
  * Transmit a single high-low pulse.
  */
 void RCSwitch::transmit(HighLow pulses) {
+  if(pulses.high == 0 || pulses.low == 0){
+    return;
+  }
   uint8_t firstLogicLevel = (this->protocol.invertedSignal) ? LOW : HIGH;
   uint8_t secondLogicLevel = (this->protocol.invertedSignal) ? HIGH : LOW;
   

@@ -75,6 +75,8 @@ class RCSwitch {
     void switchOff(const char* sGroup, const char* sDevice);
     void switchOn(char sGroup, int nDevice);
     void switchOff(char sGroup, int nDevice);
+    void switchOn(const char* sHouse, bool bGroup, int nChannel, int nDevice); // NEXA
+    void switchOff(const char* sHouse, bool bGroup, int nChannel, int nDevice); // NEXA
 
     void sendTriState(const char* sCodeWord);
     void send(unsigned long code, unsigned int length);
@@ -122,6 +124,7 @@ class RCSwitch {
         uint16_t pulseLength;
 
         HighLow syncFactor;
+        HighLow pauseFactor;
         HighLow zero;
         HighLow one;
 
@@ -153,6 +156,7 @@ class RCSwitch {
     char* getCodeWordB(int nGroupNumber, int nSwitchNumber, bool bStatus);
     char* getCodeWordC(char sFamily, int nGroup, int nDevice, bool bStatus);
     char* getCodeWordD(char group, int nDevice, bool bStatus);
+    char* getCodeWordF(const char* sHouse, bool bGroup, int nChannel, int nDevice, bool bStatus); // NEXA
     void transmit(HighLow pulses);
 
     #if not defined( RCSwitchDisableReceiving )
