@@ -79,8 +79,9 @@ class RCSwitch {
     void switchOff(const char* sHouse, bool bGroup, int nChannel, int nDevice); // NEXA
 
     void sendTriState(const char* sCodeWord);
-    void send(unsigned long code, unsigned int length);
+    void send(unsigned long long code, unsigned int length);
     void send(const char* sCodeWord);
+    void sendSpecial(const char* codeWord, int length);
     
     #if not defined( RCSwitchDisableReceiving )
     void enableReceive(int interrupt);

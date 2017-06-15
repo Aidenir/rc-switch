@@ -33,6 +33,9 @@
 
 #include "RCSwitch.h"
 
+#include <iostream>
+#include <stdio.h>
+
 #ifdef RaspberryPi
     // PROGMEM and _P functions are for AVR based microprocessors,
     // so we must normalize these for the ARM processor:
@@ -73,13 +76,13 @@ static const RCSwitch::Protocol proto[] = {
 #else
 static const RCSwitch::Protocol PROGMEM proto[] = {
 #endif
-  { 350, {  1, 31 }, { 0, 0 },  {  1,  3 }, {  3,  1 }, false },    // protocol 1
+  { 350, { 1, 31 }, { 0, 0 },  {  1,  3 }, {  3,  1 }, false },    // protocol 1
   { 650, {  1, 10 }, { 0, 0 },  {  1,  2 }, {  2,  1 }, false },    // protocol 2
   { 100, { 30, 71 }, { 0, 0 },  {  4, 11 }, {  9,  6 }, false },    // protocol 3
   { 380, {  1,  6 }, { 0, 0 },  {  1,  3 }, {  3,  1 }, false },    // protocol 4
   { 500, {  6, 14 }, { 0, 0 },  {  1,  2 }, {  2,  1 }, false },    // protocol 5
   { 450, { 23,  1 }, { 0, 0 },  {  1,  2 }, {  2,  1 }, true },     // protocol 6 (HT6P20B)
-  { 250, { 1,  40 }, { 1, 10 }, {  1,  5 }, {  1,  2 }, false }     // protocol 7 (NEXA)
+  { 295, { 1,  40 }, { 1, 10 }, {  1,  5 }, {  1,  1 }, false }     // protocol 7 (NEXA)
 };
 
 enum {
@@ -287,20 +290,44 @@ void RCSwitch::switchOff(const char* sGroup, const char* sDevice) {
   this->sendTriState( this->getCodeWordA(sGroup, sDevice, false) );
 }
 
+void RCSwitch::sendSpecial(const char* codeWord, int length){
+  for (int nRepeat = 0; nRepeat < nRepeatTransmit; nRepeat++) {
+    this->transmit(protocol.pauseFactor);
+    for (int i = 0; i < length; i++) {
+      if (codeWord[i] == '1'){
+        //this->transmit(protocol.one);
+	digitalWrite(this->nTransmitterPin, HIGH);
+	delayMicroseconds( 230);
+	digitalWrite(this->nTransmitterPin, LOW);
+	delayMicroseconds(200);
+      }
+      else{
+	digitalWrite(this->nTransmitterPin, HIGH);
+	delayMicroseconds(230);
+	digitalWrite(this->nTransmitterPin, LOW);
+	delayMicroseconds(1000);
+
+        //this->transmit(protocol.zero);
+      }
+    }
+    this->transmit(protocol.syncFactor);
+  }
+}
+
 /**
  * Switch a remote switch on (Type F with NEXA Autolearning)
  *
  */
-void switchOn(const char* sHouse, bool bGroup, int nChannel, int nDevice){
-  this->send( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, true) );
+void RCSwitch::switchOn(const char* sHouse, bool bGroup, int nChannel, int nDevice){
+  this->sendSpecial( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, true) , 65);
 }
 
 /**
  * Switch a remote switch off (Type F with NEXA Autolearning)
  *
  */
-void switchOff(const char* sHouse, bool bGroup, int nChannel, int nDevice){
-  this->send( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, false) );
+void RCSwitch::switchOff(const char* sHouse, bool bGroup, int nChannel, int nDevice){
+  this->sendSpecial( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, false) , 65);
 }
 
 
@@ -455,8 +482,8 @@ char* RCSwitch::getCodeWordD(char sGroup, int nDevice, bool bStatus) {
 /**
  TODO
  */
-char* getCodeWordF(const char* sHouse, bool bGroup, int nChannel, int nDevice, bool bStatus){
-  static char sReturn[65];
+char* RCSwitch::getCodeWordF(const char* sHouse, bool bGroup, int nChannel, int nDevice, bool bStatus){
+  static char sReturn[66];
   int nReturnPos = 0;
 
   for(int i = 0; i < 26 ; ++i){
@@ -486,6 +513,9 @@ char* getCodeWordF(const char* sHouse, bool bGroup, int nChannel, int nDevice, b
   nReturnPos += 4;
 
   sReturn[nReturnPos++] = '0';
+  sReturn[nReturnPos++] = '\0';
+
+  std::cout << sReturn << std::endl;
   return sReturn;
 }
 
@@ -521,13 +551,15 @@ void RCSwitch::sendTriState(const char* sCodeWord) {
  */
 void RCSwitch::send(const char* sCodeWord) {
   // turn the tristate code word into the corresponding bit pattern, then send it
-  unsigned long code = 0;
+  unsigned long long code = 0;
   unsigned int length = 0;
+  unsigned long long l = 1;
   for (const char* p = sCodeWord; *p; p++) {
-    code <<= 1L;
+    code <<= l;
     if (*p != '0')
-      code |= 1L;
+      code |= l;
     length++;
+    l = 1;
   }
   this->send(code, length);
 }
@@ -537,7 +569,8 @@ void RCSwitch::send(const char* sCodeWord) {
  * bits are sent from MSB to LSB, i.e., first the bit at position length-1,
  * then the bit at position length-2, and so on, till finally the bit at position 0.
  */
-void RCSwitch::send(unsigned long code, unsigned int length) {
+void RCSwitch::send(unsigned long long code, unsigned int length) {
+  std::cout << code << " " << length << std::endl;
   if (this->nTransmitterPin == -1)
     return;
 
@@ -549,13 +582,15 @@ void RCSwitch::send(unsigned long code, unsigned int length) {
   }
 #endif
 
+  unsigned long long l = 1;
   for (int nRepeat = 0; nRepeat < nRepeatTransmit; nRepeat++) {
     this->transmit(protocol.pauseFactor);
     for (int i = length-1; i >= 0; i--) {
-      if (code & (1L << i))
+      if (code & (l << i))
         this->transmit(protocol.one);
       else
         this->transmit(protocol.zero);
+      l = 1;
     }
     this->transmit(protocol.syncFactor);
   }
@@ -575,6 +610,9 @@ void RCSwitch::transmit(HighLow pulses) {
   if(pulses.high == 0 || pulses.low == 0){
     return;
   }
+  //std::cout << pulses.high << std::endl;
+  //printf("%u , %u |", pulses.high, pulses.low);
+
   uint8_t firstLogicLevel = (this->protocol.invertedSignal) ? LOW : HIGH;
   uint8_t secondLogicLevel = (this->protocol.invertedSignal) ? HIGH : LOW;
   
