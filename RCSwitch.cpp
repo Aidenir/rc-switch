@@ -297,15 +297,15 @@ void RCSwitch::sendSpecial(const char* codeWord, int length){
       if (codeWord[i] == '1'){
         //this->transmit(protocol.one);
 	digitalWrite(this->nTransmitterPin, HIGH);
-	delayMicroseconds( 230);
+	delayMicroseconds( 250);
 	digitalWrite(this->nTransmitterPin, LOW);
-	delayMicroseconds(200);
+	delayMicroseconds(170);
       }
       else{
 	digitalWrite(this->nTransmitterPin, HIGH);
-	delayMicroseconds(230);
+	delayMicroseconds(250);
 	digitalWrite(this->nTransmitterPin, LOW);
-	delayMicroseconds(1000);
+	delayMicroseconds(1250);
 
         //this->transmit(protocol.zero);
       }
