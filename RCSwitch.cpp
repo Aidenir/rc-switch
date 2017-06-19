@@ -569,7 +569,7 @@ void RCSwitch::send(const char* sCodeWord) {
  * bits are sent from MSB to LSB, i.e., first the bit at position length-1,
  * then the bit at position length-2, and so on, till finally the bit at position 0.
  */
-void RCSwitch::send(unsigned long long code, unsigned int length) {
+void RCSwitch::send(unsigned int code, unsigned int length) {
   std::cout << code << " " << length << std::endl;
   if (this->nTransmitterPin == -1)
     return;
@@ -582,15 +582,15 @@ void RCSwitch::send(unsigned long long code, unsigned int length) {
   }
 #endif
 
-  unsigned long long l = 1;
+  int typeSize = sizeof(1) * 8; // how many bits 1 long can handle
+  int indices = 1 + ((length - 1) / typeSize); // This will get how many indices of code that are used
   for (int nRepeat = 0; nRepeat < nRepeatTransmit; nRepeat++) {
     this->transmit(protocol.pauseFactor);
-    for (int i = length-1; i >= 0; i--) {
-      if (code & (l << i))
+    for (int i = length-1, index = -1; i >= 0; i--) {
+      if (code & (1 << i))
         this->transmit(protocol.one);
       else
         this->transmit(protocol.zero);
-      l = 1;
     }
     this->transmit(protocol.syncFactor);
   }
@@ -602,6 +602,7 @@ void RCSwitch::send(unsigned long long code, unsigned int length) {
   }
 #endif
 }
+
 
 /**
  * Transmit a single high-low pulse.
