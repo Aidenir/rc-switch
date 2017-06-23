@@ -77,9 +77,10 @@ class RCSwitch {
     void switchOff(char sGroup, int nDevice);
     void switchOn(const char* sHouse, bool bGroup, int nChannel, int nDevice); // NEXA
     void switchOff(const char* sHouse, bool bGroup, int nChannel, int nDevice); // NEXA
+    void setDimmer(const char* sHouse, bool bGroup, int nChannel, int nDevice, int nDimPercent); // NEXA
 
     void sendTriState(const char* sCodeWord);
-    void send(unsigned long long code, unsigned int length);
+    void send(unsigned long *code, unsigned int length);
     void send(const char* sCodeWord);
     void sendSpecial(const char* codeWord, int length);
     
@@ -112,8 +113,8 @@ class RCSwitch {
      * Thus, the pulse overall lasts (high+low)*pulseLength
      */
     struct HighLow {
-        uint8_t high;
-        uint8_t low;
+        unsigned int high;
+        unsigned int low;
     };
 
     /**
@@ -121,7 +122,8 @@ class RCSwitch {
      * pulses.
      */
     struct Protocol {
-        /** base pulse length in microseconds, e.g. 350 */
+        /** base pulse length in microseconds, e.g. 350 , if -1 then read high and
+	low in HighLow as microseconds instead of number of pulselengths*/
         uint16_t pulseLength;
 
         HighLow syncFactor;

@@ -32,6 +32,7 @@
 */
 
 #include "RCSwitch.h"
+#include <iostream>
 
 #include <iostream>
 #include <stdio.h>
@@ -82,7 +83,7 @@ static const RCSwitch::Protocol PROGMEM proto[] = {
   { 380, {  1,  6 }, { 0, 0 },  {  1,  3 }, {  3,  1 }, false },    // protocol 4
   { 500, {  6, 14 }, { 0, 0 },  {  1,  2 }, {  2,  1 }, false },    // protocol 5
   { 450, { 23,  1 }, { 0, 0 },  {  1,  2 }, {  2,  1 }, true },     // protocol 6 (HT6P20B)
-  { 295, { 1,  40 }, { 1, 10 }, {  1,  5 }, {  1,  1 }, false }     // protocol 7 (NEXA)
+  { 1, { 1*295,  40*295 }, { 1*295, 10*295 }, {  1*230,  5*200 }, {  1*230,  1*200 }, false }     // protocol 7 (NEXA)
 };
 
 enum {
@@ -319,7 +320,7 @@ void RCSwitch::sendSpecial(const char* codeWord, int length){
  *
  */
 void RCSwitch::switchOn(const char* sHouse, bool bGroup, int nChannel, int nDevice){
-  this->sendSpecial( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, true) , 65);
+  this->send( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, true));
 }
 
 /**
@@ -327,9 +328,31 @@ void RCSwitch::switchOn(const char* sHouse, bool bGroup, int nChannel, int nDevi
  *
  */
 void RCSwitch::switchOff(const char* sHouse, bool bGroup, int nChannel, int nDevice){
-  this->sendSpecial( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, false) , 65);
+  this->send( this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, false));
 }
 
+void RCSwitch::setDimmer(const char* sHouse, bool bGroup, int nChannel, int nDevice, int nDimPercent){
+  char code[75] = {0};
+  char* originalCode = this->getCodeWordF(sHouse, bGroup, nChannel, nDevice, true);
+  for(int i = 0 ; i < 65 ; ++i){
+    code[i] = originalCode[i];
+  }
+  //code[56] = '1';
+
+  code[65] = '1';
+  code[66] = '0';
+  code[67] = '1';
+  code[68] = '0';
+  code[69] = '1';
+  code[70] = '0';
+  code[71] = '1';
+  code[72] = '0';
+
+  code[73] = '0';
+  code[74] = '\0';
+  std::cout << "Kode: " << code << std::endl;
+  this->send(code);
+}
 
 /**
  * Returns a char[13], representing the code word to be send.
@@ -524,25 +547,37 @@ char* RCSwitch::getCodeWordF(const char* sHouse, bool bGroup, int nChannel, int 
  */
 void RCSwitch::sendTriState(const char* sCodeWord) {
   // turn the tristate code word into the corresponding bit pattern, then send it
-  unsigned long code = 0;
-  unsigned int length = 0;
+  int typeSize = sizeof(1L) * 8; // how many bits 1 long can handle
+  int max  = 512; // max number of bits to support
+  unsigned long code[max / typeSize] = {0};
+  unsigned int length = 0, index = -1; // Set to -1 since first loop will increment it
+  std::cout << "Code word " << sCodeWord << std::endl;
+
   for (const char* p = sCodeWord; *p; p++) {
-    code <<= 2L;
+    if(length % typeSize == 0 )
+      index++;
+
+    code[index] <<= 2L;
     switch (*p) {
       case '0':
         // bit pattern 00
         break;
       case 'F':
         // bit pattern 01
-        code |= 1L;
+        code[index] |= 1L;
         break;
       case '1':
         // bit pattern 11
-        code |= 3L;
+        code[index] |= 3L;
         break;
     }
     length += 2;
   }
+  std::cout << "hej " << length << std::endl;
+  for(int i = 0; i <= index; ++i){
+    std::cout << " code [" << i << "] is " << code[i] << std::endl;
+  }
+ 
   this->send(code, length);
 }
 
@@ -551,15 +586,21 @@ void RCSwitch::sendTriState(const char* sCodeWord) {
  */
 void RCSwitch::send(const char* sCodeWord) {
   // turn the tristate code word into the corresponding bit pattern, then send it
-  unsigned long long code = 0;
-  unsigned int length = 0;
-  unsigned long long l = 1;
-  for (const char* p = sCodeWord; *p; p++) {
-    code <<= l;
+  int typeSize = sizeof(1L) * 8; // how many bits 1 long can handle
+  int max  = 512; // max number of bits to support
+  unsigned long code[max / typeSize] = {0};
+  unsigned int length = 0, index = -1; // Set to -1 since first loop will increment it
+
+  for (const char* p = sCodeWord; *p; p++, length++) {
+    if(length % typeSize == 0 )
+      index++;
+
+    code[index] <<= 1;
     if (*p != '0')
-      code |= l;
-    length++;
-    l = 1;
+      code[index] |= 1;
+  }
+  for(int i = 0; i <= index; ++i){
+    std::cout << " code [" << i << "] is " << code[i] << std::endl;
   }
   this->send(code, length);
 }
@@ -569,10 +610,13 @@ void RCSwitch::send(const char* sCodeWord) {
  * bits are sent from MSB to LSB, i.e., first the bit at position length-1,
  * then the bit at position length-2, and so on, till finally the bit at position 0.
  */
-void RCSwitch::send(unsigned long long code, unsigned int length) {
-  std::cout << code << " " << length << std::endl;
+void RCSwitch::send(unsigned long *code, unsigned int length) {
   if (this->nTransmitterPin == -1)
     return;
+
+  std::cout << "Length: " << length << std::endl;
+  int typeSize = sizeof(1L) * 8; // how many bits 1 long can handle
+  int indices = 1 + ((length - 1) / typeSize); // This will get how many indices of code that are used
 
 #if not defined( RCSwitchDisableReceiving )
   // make sure the receiver is disabled while we transmit
@@ -582,16 +626,71 @@ void RCSwitch::send(unsigned long long code, unsigned int length) {
   }
 #endif
 
-  unsigned long long l = 1;
   for (int nRepeat = 0; nRepeat < nRepeatTransmit; nRepeat++) {
+    //std::cout << "Pause" << std::endl;
     this->transmit(protocol.pauseFactor);
-    for (int i = length-1; i >= 0; i--) {
-      if (code & (l << i))
+
+
+
+for (int i = length-1, index = 0,j=0; i >= 0; i--,j++) {
+  if( j != 0 && (j % typeSize == 0 ) ){
+   // std::cout << "code[" << index << "] done encoding" << std::endl; 
+    std::cout << " ";
+    index++;
+  }
+
+  unsigned int shift = -1;
+/*
+  if (index < indices && length > typeSize && j == 0){
+    shift = typeSize - 1;
+  }else if(index < indices && length > typeSize && j < typeSize){
+    shift = typeSize - 1 - j;
+  }else if(index < indices && length > typeSize && j > typeSize){
+    shift = typeSize - 1 - (j % typeSize);
+  }else{
+    shift = i;
+  }
+*/
+
+  shift = (index < indices - 1 && length > typeSize) ? typeSize - 1 - (j % typeSize) : i;
+  //std::cout << "Shift: " << shift << " Index: " << index << " Indices: " << indices <<  std::endl;
+  if (code[index] & (1L << shift)){
+    this->transmit(protocol.one);
+    std::cout << "1";
+  }else{
+    this->transmit(protocol.zero);
+    std::cout << "0";
+  }
+}
+
+
+
+
+
+/*
+
+    for (int i = length-1, index = 0,j=0; i >= 0; i--,j++) {
+      if( j != 0 && (j % typeSize == 0 ) ){
+  	//std::cout << "index++" << index << " ";
+  	std::cout << " " ;
+	std::cout << "code [" << index << "] is " << code[index];
+        index++;
+      }
+
+      int shift = typeSize - ((j-1) % typeSize);
+      std::cout << "Shifty:" << shift << std::endl;
+      if (code[index] & (1L << i%typeSize)){
         this->transmit(protocol.one);
-      else
+        std::cout << 1;
+      }else{
         this->transmit(protocol.zero);
-      l = 1;
+        std::cout << 0;
+      }
     }
+*/
+    
+    std::cout << std::endl;
+    //std::cout << " sync" << std::endl;
     this->transmit(protocol.syncFactor);
   }
 
@@ -610,16 +709,16 @@ void RCSwitch::transmit(HighLow pulses) {
   if(pulses.high == 0 || pulses.low == 0){
     return;
   }
-  //std::cout << pulses.high << std::endl;
-  //printf("%u , %u |", pulses.high, pulses.low);
-
   uint8_t firstLogicLevel = (this->protocol.invertedSignal) ? LOW : HIGH;
   uint8_t secondLogicLevel = (this->protocol.invertedSignal) ? HIGH : LOW;
+  unsigned int high = this->protocol.pulseLength * pulses.high;
+  unsigned int low = this->protocol.pulseLength * pulses.low;
+  //std::cout << "High: " << high << " Low: " << low << std::endl;
   
   digitalWrite(this->nTransmitterPin, firstLogicLevel);
-  delayMicroseconds( this->protocol.pulseLength * pulses.high);
+  delayMicroseconds(high);
   digitalWrite(this->nTransmitterPin, secondLogicLevel);
-  delayMicroseconds( this->protocol.pulseLength * pulses.low);
+  delayMicroseconds(low);
 }
 
 
